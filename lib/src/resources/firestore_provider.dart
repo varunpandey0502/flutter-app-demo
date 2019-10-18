@@ -46,8 +46,11 @@ class FirestoreProvider {
         .where('submissionType', isEqualTo: 'Kudos Given')
         .getDocuments();
 
+    // print(kudosGivenSubmissionType.documents.first['typeId']);
+
     QuerySnapshot kudosGivenSnapshot = await _firestore
         .collection('submissions')
+        .where('userId', isEqualTo: 1)
         .where('submissionTypeId',
             isEqualTo: kudosGivenSubmissionType.documents.first['typeId'])
         .getDocuments();
