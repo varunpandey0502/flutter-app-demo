@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:demo/src/bloc_providers/user_bloc_provider.dart';
 import 'package:demo/src/blocs/user_bloc.dart';
 
@@ -10,16 +11,13 @@ class Profile extends StatelessWidget {
   BuildContext _buildContext;
   UserBloc _userBloc;
 
-  User demoUser;
-  UsageStatistics demoUsageStatistics;
+  User _user;
+  UsageStatistics _usageStatistics;
 
   @override
   Widget build(BuildContext context) {
     _buildContext = context;
     _userBloc = UserBlocProvider.of(context);
-
-    demoUser = _userBloc.demoUser;
-    demoUsageStatistics = _userBloc.demoUsageStatistics;
 
     return Scaffold(
       appBar: AppBar(
@@ -72,7 +70,23 @@ class Profile extends StatelessWidget {
           right: 24,
         ),
         child: SingleChildScrollView(
-          child: _buildBody(),
+          child: StreamBuilder(
+            stream: _userBloc.userDetails,
+            builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
+              if (!snapshot.hasData) return LinearProgressIndicator();
+              DocumentSnapshot documentSnapshot = snapshot.data.documents.first;
+              _user = User.fromSnapshot(documentSnapshot);
+              return FutureBuilder<Object>(
+                future: _userBloc.getUsageStatistics(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) return LinearProgressIndicator();
+                  _usageStatistics = snapshot.data;
+
+                  return _buildBody();
+                },
+              );
+            },
+          ),
         ),
       ),
     );
@@ -120,9 +134,9 @@ class Profile extends StatelessWidget {
                   TextSpan(
                     style: Theme.of(_buildContext).textTheme.subhead,
                     children: [
-                      TextSpan(text: demoUser.firstName),
+                      TextSpan(text: _user.firstName),
                       TextSpan(text: ' '),
-                      TextSpan(text: demoUser.lastName),
+                      TextSpan(text: _user.lastName),
                     ],
                   ),
                 ),
@@ -133,9 +147,9 @@ class Profile extends StatelessWidget {
                   TextSpan(
                     style: Theme.of(_buildContext).textTheme.subtitle,
                     children: [
-                      TextSpan(text: demoUser.role),
+                      TextSpan(text: _user.role),
                       TextSpan(text: ' | '),
-                      TextSpan(text: demoUser.branchName),
+                      TextSpan(text: _user.branchName),
                     ],
                   ),
                 ),
@@ -147,7 +161,7 @@ class Profile extends StatelessWidget {
           height: 20,
         ),
         Text(
-          'Hi! My name is John. I\'m a smart store supervisor from Victoria. I enjoy managing inventory and  ensuring ordrs are met.',
+          _user.bio,
         ),
       ],
     );
@@ -158,10 +172,11 @@ class Profile extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: <Widget>[
         _buildUsageStatisticsContainer(
-            demoUsageStatistics.numberOfSubmissions.toString(), 'Reports'),
-        _buildUsageStatisticsContainer(demoUsageStatistics.kudosGiven, 'Kudos'),
+            _usageStatistics.numberOfSubmissions.toString(), 'Reports'),
         _buildUsageStatisticsContainer(
-            demoUsageStatistics.totalPoints.toString(), 'Points'),
+            _usageStatistics.kudosGiven.toString(), 'Kudos'),
+        _buildUsageStatisticsContainer(
+            _usageStatistics.totalPoints.toString(), 'Points'),
       ],
     );
   }
@@ -193,48 +208,61 @@ class Profile extends StatelessWidget {
   }
 
   _buildProfileLevel() {
-    return GridView.count(
-        physics: NeverScrollableScrollPhysics(),
-        shrinkWrap: true,
-        crossAxisCount: 3,
-        childAspectRatio: 1.0,
-        padding: const EdgeInsets.all(4.0),
-        mainAxisSpacing: 20.0,
-        crossAxisSpacing: 10.0,
-        children: _userBloc.levels.map((String level) {
-          return new GridTile(
-              footer: Center(
-                child: Text(
-                  level,
-                  style: Theme.of(_buildContext).textTheme.body2,
-                ),
-              ),
-              child: Column(
-                children: <Widget>[
-                  Container(
-                    padding: EdgeInsets.all(2.0), // borde width
-                    decoration: BoxDecoration(
-                      color: Color(0xFFFFFFFF), // border color
-                      shape: BoxShape.circle,
-                    ),
-                    child: CircleAvatar(
-                      radius: 30,
-                      backgroundColor: level == _userBloc.usageStatistics.level
-                          ? Colors.amber
-                          : Theme.of(_buildContext).disabledColor,
-                      child: Image.asset(
-                        'assets/images/trophy.png',
-                        height: 40,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 10,
-                  ),
-                ],
-              ));
-        }).toList());
+    return Column(
+      children: <Widget>[
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: <Widget>[
+            _buildTrophy(_userBloc.levels[0]),
+            _buildTrophy(_userBloc.levels[1]),
+            _buildTrophy(_userBloc.levels[2]),
+          ],
+        ),
+        SizedBox(
+          height: 20,
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: <Widget>[
+            _buildTrophy(_userBloc.levels[3]),
+            _buildTrophy(_userBloc.levels[4]),
+            _buildTrophy(_userBloc.levels[5]),
+          ],
+        ),
+      ],
+    );
+  }
+
+  _buildTrophy(String level) {
+    return Column(
+      children: <Widget>[
+        Container(
+          padding: EdgeInsets.all(2.0), // border width
+          decoration: BoxDecoration(
+            color: Color(0xFFFFFFFF), // border color
+            shape: BoxShape.circle,
+          ),
+          child: CircleAvatar(
+            radius: 30,
+            backgroundColor: level == _usageStatistics.level
+                ? Colors.amber
+                : Theme.of(_buildContext).disabledColor,
+            child: Image.asset(
+              'assets/images/trophy.png',
+              height: 40,
+              color: Colors.white,
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 10,
+        ),
+        Text(
+          level,
+          style: Theme.of(_buildContext).textTheme.body2,
+        ),
+      ],
+    );
   }
 
   _buildReportsSection() {
@@ -253,8 +281,12 @@ class Profile extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: <Widget>[
-              _buildReportsCountContainer('10', 10),
-              _buildReportsCountContainer('90', 10),
+              _buildReportsCountContainer(
+                _usageStatistics.numberOfOpenSubmissions.toString(),
+              ),
+              _buildReportsCountContainer(
+                _usageStatistics.numberOfSubmissions.toString(),
+              ),
             ],
           ),
         ],
@@ -276,9 +308,9 @@ class Profile extends StatelessWidget {
     );
   }
 
-  _buildReportsCountContainer(String count, double margin) {
+  _buildReportsCountContainer(String count) {
     return Container(
-      margin: EdgeInsets.only(left: margin, top: margin, right: margin),
+      margin: EdgeInsets.only(left: 10, top: 10, right: 10),
       height: 60,
       width: 100,
       color: Theme.of(_buildContext).highlightColor,
