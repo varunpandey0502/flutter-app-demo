@@ -53,7 +53,7 @@ class Profile extends StatelessWidget {
           ),
           BottomNavigationBarItem(
             icon: Icon(
-              Icons.sentiment_very_satisfied,
+              Icons.sentiment_dissatisfied,
               color: Colors.white,
             ),
             title: Text(
